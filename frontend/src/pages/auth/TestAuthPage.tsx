@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { AuthForm } from '../../components/auth/LoginForm';
 import { OAuthCallback } from '../../components/auth/OAuthCallback';
 import { supabase } from '../../lib/supabase';
+import { Request, Response, NextFunction } from 'express';
 
 export const TestAuthPage: React.FC = () => {
   const [user, setUser] = useState<any>(null);
