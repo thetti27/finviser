@@ -1,0 +1,288 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String    @id @default(cuid())
+  email             String    @unique
+  password          String
+  firstName         String
+  lastName          String
+  isEmailVerified   Boolean   @default(false)
+  emailVerificationToken String?
+  passwordResetToken String?
+  passwordResetExpires DateTime?
+  refreshToken      String?
+  refreshTokenExpires DateTime?
+  lastLoginAt       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Profile relationship
+  profile           Profile?
+
+  // Financial data relationships
+  accounts          Account[]
+  portfolios        Portfolio[]
+  transactions      Transaction[]
+  riskAssessments   RiskAssessment[]
+
+  @@map("users")
+}
+
+model Profile {
+  id                String    @id @default(cuid())
+  userId            String    @unique
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Personal Information
+  dateOfBirth       DateTime?
+  phoneNumber       String?
+  address           String?
+  city              String?
+  state             String?
+  zipCode           String?
+  country           String?
+  
+  // Financial Profile
+  riskTolerance     RiskTolerance @default(CONSERVATIVE)
+  investmentGoals   InvestmentGoal[]
+  annualIncome      Decimal?  @db.Decimal(15, 2)
+  netWorth          Decimal?  @db.Decimal(15, 2)
+  
+  // Risk Assessment
+  lastRiskAssessment DateTime?
+  
+  // Business Information (for small business users)
+  businessName      String?
+  businessType      BusinessType?
+  businessRegistrationNumber String?
+  
+  // Preferences
+  currency          String    @default("USD")
+  timezone          String    @default("UTC")
+  language          String    @default("en")
+  
+  // Security
+  twoFactorEnabled  Boolean   @default(false)
+  twoFactorSecret   String?
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relationships
+  riskAssessments   RiskAssessment[]
+
+  @@map("profiles")
+}
+
+model Account {
+  id                String    @id @default(cuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Account Information
+  name              String
+  type              AccountType
+  institution       String
+  accountNumber     String?   // Encrypted in application layer
+  routingNumber     String?   // Encrypted in application layer
+  
+  // Balance Information
+  currentBalance    Decimal   @db.Decimal(15, 2) @default(0)
+  availableBalance  Decimal   @db.Decimal(15, 2) @default(0)
+  
+  // Status
+  isActive          Boolean   @default(true)
+  lastSyncAt        DateTime?
+  
+  // Integration
+  integrationId     String?   // For bank API integration
+  integrationData   Json?     // Encrypted integration details
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relationships
+  transactions      Transaction[]
+
+  @@map("accounts")
+}
+
+model Portfolio {
+  id                String    @id @default(cuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  name              String
+  description       String?
+  type              PortfolioType
+  riskLevel         RiskTolerance
+  
+  // Performance
+  totalValue        Decimal   @db.Decimal(15, 2) @default(0)
+  totalReturn       Decimal   @db.Decimal(10, 4) @default(0)
+  totalReturnPercent Decimal  @db.Decimal(10, 4) @default(0)
+  
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relationships
+  holdings          Holding[]
+
+  @@map("portfolios")
+}
+
+model Holding {
+  id                String    @id @default(cuid())
+  portfolioId       String
+  portfolio         Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  
+  symbol            String
+  name              String
+  type              AssetType
+  
+  quantity          Decimal   @db.Decimal(15, 6)
+  averagePrice      Decimal   @db.Decimal(15, 4)
+  currentPrice      Decimal   @db.Decimal(15, 4)
+  marketValue       Decimal   @db.Decimal(15, 2)
+  totalReturn       Decimal   @db.Decimal(15, 2)
+  totalReturnPercent Decimal  @db.Decimal(10, 4)
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@map("holdings")
+}
+
+model Transaction {
+  id                String    @id @default(cuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountId         String
+  account           Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  
+  // Transaction Details
+  type              TransactionType
+  category          String
+  description       String
+  amount            Decimal   @db.Decimal(15, 2)
+  currency          String    @default("USD")
+  
+  // Date and Status
+  date              DateTime
+  status            TransactionStatus @default(PENDING)
+  
+  // Additional Information
+  reference         String?
+  notes             String?
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@map("transactions")
+}
+
+model RiskAssessment {
+  id                String    @id @default(cuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profileId         String?
+  profile           Profile?  @relation(fields: [profileId], references: [id], onDelete: SetNull)
+  
+  // Assessment Data
+  answers           Json      // Array of question-answer pairs
+  riskScore         Decimal   @db.Decimal(5, 4)
+  riskProfile       RiskTolerance
+  
+  // Context
+  lifeEvent         String?   // e.g., "marriage", "job_change", "retirement"
+  notes             String?
+  
+  // Timestamps
+  completedAt       DateTime  @default(now())
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@map("risk_assessments")
+}
+
+// Enums
+enum RiskTolerance {
+  CONSERVATIVE
+  MODERATE
+  AGGRESSIVE
+}
+
+enum InvestmentGoal {
+  RETIREMENT
+  EMERGENCY_FUND
+  HOME_PURCHASE
+  EDUCATION
+  VACATION
+  BUSINESS_EXPANSION
+  TAX_OPTIMIZATION
+  INCOME_GENERATION
+}
+
+enum BusinessType {
+  SOLE_PROPRIETORSHIP
+  PARTNERSHIP
+  LLC
+  CORPORATION
+  NON_PROFIT
+}
+
+enum AccountType {
+  CHECKING
+  SAVINGS
+  CREDIT_CARD
+  INVESTMENT
+  LOAN
+  MORTGAGE
+}
+
+enum PortfolioType {
+  PERSONAL
+  BUSINESS
+  RETIREMENT
+  EDUCATION
+  TAX_ADVANTAGED
+}
+
+enum AssetType {
+  STOCK
+  BOND
+  MUTUAL_FUND
+  ETF
+  REAL_ESTATE
+  COMMODITY
+  CRYPTOCURRENCY
+  CASH
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+  TRANSFER
+  INVESTMENT
+  LOAN_PAYMENT
+  INTEREST
+  DIVIDEND
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
